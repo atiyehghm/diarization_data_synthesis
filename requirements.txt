@@ -1,0 +1,17 @@
+numpy
+scipy
+librosa
+pydub
+soundfile
+pyyaml
+tqdm
+pandas
+matplotlib
+torch-audiomentations
+audiomentations
+torchaudio
+torchvision
+torch
+librosa
+pyyaml
+tqdm
