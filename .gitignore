@@ -3,4 +3,4 @@ poetry.lock
 pyproject.toml
 __pycache__/
 **/__pycache__/
-base_fongig.yaml
+/configs/base_config.yaml
