@@ -31,6 +31,7 @@ class DialogComposer:
             for _ in range(turns_per_speaker):
                 seg = self.speaker_db.get_random_utterance(spk)
                 seg['volume'] = volumes[i]
+
                 all_segments.append(seg)
         random.shuffle(all_segments)
         return self._compose_track(all_segments, pause_range=(0, self.config['max_pause']))
@@ -46,6 +47,7 @@ class DialogComposer:
             for _ in range(turns_per_speaker):
                 seg = self.speaker_db.get_random_utterance(spk)
                 seg['volume'] = volumes[i]
+
                 # overlap = np.random.uniform(*self.config['overlap_range'])
                 # pause = np.random.uniform(-overlap, self.config['max_pause'])
                 pause = self._sample_pause(
@@ -86,12 +88,15 @@ class DialogComposer:
         track = []
         metadata = []
         current_pos = 0.0
-        
+        total_silence = 0.0
+        speakers = []
+
         for seg in segments:
             audio = self.normalizer.normalize(seg['audio_path'])
             audio = self.fade.apply_fade(audio, fade_out=0.02)
             audio *= seg['volume']
             track.append(audio)
+            speakers.append(seg['speaker_id'])
             metadata.append({
                 'speaker': seg['speaker_id'],
                 'start': current_pos,
@@ -100,6 +105,7 @@ class DialogComposer:
             })
 
             pause = np.random.uniform(*pause_range)
+            total_silence += pause
             if pause > 0:
                 silence = np.zeros(int(pause * self.config['sr']))
                 track.append(silence)
@@ -111,8 +117,10 @@ class DialogComposer:
                 current_pos += pause
             
             current_pos += len(audio)/self.config['sr']
-            
-        return np.hstack(track), metadata
+        stats = {"overlap_duration": 0.0,
+                 "silence_duration": round(total_silence, 2),
+                 "num_speakers": len(set(speakers))}
+        return np.hstack(track), metadata, stats
 
 
     def _sample_pause(self, max_overlap, max_pause):
@@ -131,14 +139,20 @@ class DialogComposer:
         tracks = []
         metadata = []
         max_duration = 0
+        total_silence = 0
+        total_overlap = 0
         
         current_pos = 0
         result = np.zeros((0,))
-        
+        speakers = []
         for seg, pause in segments:
             if len(result) == 0:
                 pause = max(0, pause)
-
+            if pause > 0:
+                total_silence += pause
+            else:
+                total_overlap += pause
+            
             audio = self.normalizer.normalize(seg['audio_path'])
             audio = self.fade.apply_fade(audio, fade_out=0.02)
             audio *= seg['volume']
@@ -163,13 +177,18 @@ class DialogComposer:
 
             # Mix audio
             result[segment_start:segment_end] += audio
-
+            
+            speakers.append(seg['speaker_id'])
             metadata.append({
                 'speaker': seg['speaker_id'],
                 'start': segment_start / self.config['sr'],
                 'end': segment_end / self.config['sr'],
                 'type': 'speech'
             })
+        
 
-
-        return result, metadata
+        stats = {"overlap_duration": abs(round(total_overlap, 2)),
+                 "silence_duration": round(total_silence, 2),
+                 "num_speakers": len(set(speakers))}
+                 
+        return result, metadata, stats

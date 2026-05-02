@@ -9,7 +9,8 @@ import soundfile as sf
 from .rir_augmenter import RIRAugmenter
 from .noise_augmenter import NoiseAugmenter
 import json
-
+import os
+import pandas as pd
 
 class SyntheticDatasetGenerator:
     def __init__(self, config_path):
@@ -28,37 +29,62 @@ class SyntheticDatasetGenerator:
         )
         
         if dialog_type == 'monologue':
-            audio, metadata = self.composer._generate_monologue()
+            audio, metadata, stats = self.composer._generate_monologue()
         elif dialog_type == 'dialog':
-            audio, metadata = self.composer._generate_dialog()
+            audio, metadata, stats = self.composer._generate_dialog()
         else:
-            audio, metadata = self.composer._generate_overlap()
+            audio, metadata, stats = self.composer._generate_overlap()
 
+        stats['noise_applied'] = False
         if np.random.rand() < self.config['noise_prob']:
-            audio = self.noise_aug.apply_noise(audio,)
+            audio = self.noise_aug.apply_noise(audio)
+            stats['noise_applied'] = True
         
+        stats['rir_applied'] = False
         if np.random.rand() < self.config['rir_prob']:
             audio = self.rir_aug.apply_rir(audio)
-        
+            stats['rir_applied'] = True
+
         return {
             'audio': audio,
             'metadata': metadata,
             'dialog_type': dialog_type,
-            'sr': self.config['sr']
+            'sr': self.config['sr'],
+            'stats': stats
         }
 
     def generate(self, output_dir, num_samples):
         output_path = Path(output_dir)
         output_path.mkdir(exist_ok=True, parents=True)
+        data_path = Path(os.path.join(output_path, 'data'))
+        data_path.mkdir(exist_ok=True, parents=True)
+
+        meta_data = []
 
         for i in tqdm(range(num_samples)):
             track = self._generate_track()
             filename = f"track_{i:06d}_{track['dialog_type']}.wav"
 
-            sf.write(output_path / filename, track['audio'], track['sr'])
-            self._save_metadata(output_path / f"{filename}.rttm", track['metadata'])
+            sf.write(os.path.join(data_path, filename), track['audio'], track['sr'])
+            self._save_annotations(data_path / f"{filename}.rttm", track['metadata'])
 
-    def _save_metadata(self, path, metadata):
+            track_meta = {
+                'file_path': "/".join(os.path.join(data_path, filename).split("/")[-3:]),
+                'annotation_path': "/".join(os.path.join(data_path, f"{filename}.rttm").split("/")[-3:]),
+                'type': track['dialog_type'],
+                'audio_duration': round(len(track['audio']) / track['sr'], 3),
+                'num_speakers': track['stats']['num_speakers'],
+                'overlap_duration': track['stats']['overlap_duration'],
+                'silence_duration': track['stats']['silence_duration'],
+                'rir_applied': track['stats']['rir_applied'],
+                'noise_applied': track['stats']['noise_applied']
+            }
+            meta_data.append(track_meta)
+        
+        pd.DataFrame(meta_data).to_csv(os.path.join(output_path, "metadata.csv"), index=False)
+        
+
+    def _save_annotations(self, path, metadata):
         """Сохранение RTTM-разметки"""
         with open(path, 'w') as f:
             for seg in metadata:
