@@ -1,27 +1,40 @@
 import argparse
+import random
+from typing import Dict
 import numpy as np
 from .utils.audio_io import load_audio, save_audio
 
 
 class FadeGenerator:
+    def __init__(self, config: Dict):
+        self.config = config
+
+
     def apply_fade(self, audio, fade_in=0.0, fade_out=0.0, curve='linear'):
-        length = len(audio)
         
         if fade_in > 0:
-            audio = self._apply_fade_in(audio, fade_in, curve)
+            fade_in_value = random.uniform(0, fade_in)
+            audio = self._apply_fade_in(audio, fade_in_value, curve)
         if fade_out > 0:
-            audio = self._apply_fade_out(audio, fade_out, curve)
+            fade_out_value = random.uniform(0, fade_out)
+            audio = self._apply_fade_out(audio, fade_out_value, curve)
         
         return audio
 
     def _apply_fade_in(self, audio, duration, curve):
-        fade_samples = int(duration * 1000)
+        fade_samples = int(duration * self.config['sr'])
+        fade_samples = min(fade_samples, len(audio))
+        if fade_samples <= 0:
+            return audio
         fade_curve = self._generate_curve(fade_samples, curve)
         audio[:fade_samples] *= fade_curve
         return audio
 
     def _apply_fade_out(self, audio, duration, curve):
-        fade_samples = int(duration * 1000)
+        fade_samples = int(duration * self.config['sr'])
+        fade_samples = min(fade_samples, len(audio))
+        if fade_samples <= 0:
+            return audio
         fade_curve = self._generate_curve(fade_samples, curve)[::-1]
         audio[-fade_samples:] *= fade_curve
         return audio

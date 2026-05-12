@@ -3,6 +3,7 @@ import numpy as np
 from scipy.io import wavfile
 from scipy.signal import fftconvolve
 import os
+from data_scripts.data_utils.utils.audio_io import load_audio
 import glob
 
 
@@ -29,7 +30,7 @@ class RIRAugmenter:
             sr = self.config['sr']
 
         if isinstance(audio_input, str):
-            sr, audio = wavfile.read(audio_input)
+            audio = load_audio(audio_input)
         else:
             audio = audio_input
 
@@ -37,8 +38,13 @@ class RIRAugmenter:
         audio = audio.astype(np.float32)
         rir = random.choice(self.rir_samples).astype(np.float32)
 
+        rir = rir / np.linalg.norm(rir)
+
         # Convolution
         reverbed = fftconvolve(audio, rir, mode='full')[:len(audio)]
+
+        if np.max(np.abs(reverbed)) > 0:
+            reverbed = reverbed / np.max(np.abs(reverbed))
 
         return reverbed
 

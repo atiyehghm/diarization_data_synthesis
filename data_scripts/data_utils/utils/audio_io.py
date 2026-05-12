@@ -3,8 +3,8 @@ import soundfile as sf
 import numpy as np
 
 
-def load_audio(path, sr=None):
-    audio, sample_rate = sf.read(path)
+def load_audio(path, sr=16000):
+    audio, sample_rate = librosa.load(path, mono=True)
     if sr and sample_rate != sr:
         audio = librosa.resample(audio, orig_sr=sample_rate, target_sr=sr)
     return audio

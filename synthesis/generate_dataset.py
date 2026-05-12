@@ -2,9 +2,10 @@ import yaml
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+
+from synthesis.white_noise_augmenter import WhiteNoiseAugmenter
 from .dialog_composer import DialogComposer
 from .speaker_database import SpeakerDatabase
-#from .data_scripts.data_utils import NoiseAugmenter, RirAugmenter
 import soundfile as sf
 from .rir_augmenter import RIRAugmenter
 from .noise_augmenter import NoiseAugmenter
@@ -21,6 +22,7 @@ class SyntheticDatasetGenerator:
         self.composer = DialogComposer(self.config, self.speaker_db)
         self.noise_aug = NoiseAugmenter(self.config)
         self.rir_aug = RIRAugmenter(self.config)
+        self.white_noise_aug = WhiteNoiseAugmenter(self.config)
 
     def _generate_track(self):
         dialog_type = np.random.choice(
@@ -45,6 +47,11 @@ class SyntheticDatasetGenerator:
             audio = self.rir_aug.apply_rir(audio)
             stats['rir_applied'] = True
 
+        stats['white_noise_applied'] = False
+        if np.random.rand() < self.config['white_noise_prob']:
+            audio = self.white_noise_aug.apply_noise(audio)
+            stats['white_noise_applied'] = True
+
         return {
             'audio': audio,
             'metadata': metadata,
@@ -59,6 +66,8 @@ class SyntheticDatasetGenerator:
         data_path = Path(os.path.join(output_path, 'data'))
         data_path.mkdir(exist_ok=True, parents=True)
 
+
+        spec_data = []
         meta_data = []
 
         for i in tqdm(range(num_samples)):
@@ -68,7 +77,7 @@ class SyntheticDatasetGenerator:
             sf.write(os.path.join(data_path, filename), track['audio'], track['sr'])
             self._save_annotations(data_path / f"{filename}.rttm", track['metadata'])
 
-            track_meta = {
+            track_spec = {
                 'file_path': "/".join(os.path.join(data_path, filename).split("/")[-3:]),
                 'annotation_path': "/".join(os.path.join(data_path, f"{filename}.rttm").split("/")[-3:]),
                 'type': track['dialog_type'],
@@ -77,12 +86,32 @@ class SyntheticDatasetGenerator:
                 'overlap_duration': track['stats']['overlap_duration'],
                 'silence_duration': track['stats']['silence_duration'],
                 'rir_applied': track['stats']['rir_applied'],
-                'noise_applied': track['stats']['noise_applied']
+                'noise_applied': track['stats']['noise_applied'],
+                'white_noise_applied' : track['stats']['white_noise_applied']
             }
+
+            starts = []
+            ends = []
+            speakers = []
+
+            for seg in track['metadata']:
+                if seg['type'] != "speech":
+                    continue
+                starts.append(seg['start'])
+                ends.append(seg['end'])
+                speakers.append(seg['speaker'])
+
+            track_meta = {
+                'file_path': "/".join(os.path.join(data_path, filename).split("/")[-3:]),
+                'timestamps_start': starts,
+                'timestamps_end': ends,
+                'speakers': speakers,
+            }
+            spec_data.append(track_spec)
             meta_data.append(track_meta)
         
         pd.DataFrame(meta_data).to_csv(os.path.join(output_path, "metadata.csv"), index=False)
-        
+        pd.DataFrame(spec_data).to_csv(os.path.join(output_path, "spec.csv"), index=False)
 
     def _save_annotations(self, path, metadata):
         """Сохранение RTTM-разметки"""

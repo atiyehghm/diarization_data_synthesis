@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Dict, Tuple
-from data_scripts.data_utils import AudioNormalizer, AudioMixer, FadeGenerator
+from data_scripts.data_utils import AudioNormalizer, FadeGenerator
 import random
 
 
@@ -10,7 +10,7 @@ class DialogComposer:
         self.speaker_db = speaker_db
 
         self.normalizer = AudioNormalizer()
-        self.fade = FadeGenerator()
+        self.fade = FadeGenerator(self.config)
 
     def _generate_monologue(self) -> Tuple[np.ndarray, List[Dict]]:
         speaker = self.speaker_db.get_random_speakers(1)[0]
@@ -93,7 +93,7 @@ class DialogComposer:
 
         for seg in segments:
             audio = self.normalizer.normalize(seg['audio_path'])
-            audio = self.fade.apply_fade(audio, fade_out=0.02)
+            audio = self.fade.apply_fade(audio, fade_out=self.config['fade_out'], fade_in=self.config['fade_in'])
             audio *= seg['volume']
             track.append(audio)
             speakers.append(seg['speaker_id'])
@@ -154,7 +154,7 @@ class DialogComposer:
                 total_overlap += pause
             
             audio = self.normalizer.normalize(seg['audio_path'])
-            audio = self.fade.apply_fade(audio, fade_out=0.02)
+            audio = self.fade.apply_fade(audio, fade_out=self.config['fade_out'], fade_in=self.config['fade_in'])
             audio *= seg['volume']
 
             start_offset = int(self.config['sr'] * pause)

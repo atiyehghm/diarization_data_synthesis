@@ -3,6 +3,7 @@ import numpy as np
 from scipy.io import wavfile
 import os
 import glob
+from data_scripts.data_utils.utils.audio_io import load_audio
 
 
 class NoiseAugmenter:
@@ -24,7 +25,7 @@ class NoiseAugmenter:
 
     def apply_noise(self, audio_input):
         if isinstance(audio_input, str):
-            sr, audio_samples = wavfile.read(audio_input)
+            audio_samples = load_audio(audio_input)
         else:
             audio_samples = audio_input
 
