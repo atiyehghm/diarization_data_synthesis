@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Dict
 from collections import defaultdict
 import soundfile as sf
+import pandas as pd
 
 
 class SpeakerDatabase:
@@ -16,26 +17,43 @@ class SpeakerDatabase:
         self.data_root = Path(config['speaker_data_path'])
         self.min_duration = config.get('min_sample_duration', 1.0)
         self.min_samples = config.get('min_speaker_samples', 1)
+        self.include_transcripts = config.get('include_transcripts', False)
 
         self.meta = {}
         self.audio_index = defaultdict(list)
+        if self.include_transcripts:
+            self.transcripts = pd.read_csv(os.path.join(self.data_root, "metadata.csv"))
 
         for i, dir in enumerate(os.listdir(self.data_root)):
             self.meta[i] = dir
-            for data in os.listdir(os.path.join(self.data_root, dir)):
-                if os.path.splitext(data)[1] == '.wav':
-                    audio_path = os.path.join(self.data_root, dir, data)
-                    try:
-                        duration = self._get_audio_duration(audio_path)
-                        if duration >= self.min_duration:
-                            self.audio_index[i].append(
-                                {
-                                    'audio_path': audio_path,
-                                    'duration': duration,
-                                }
-                            )
-                    except Exception as e:
-                        logging.warning(f"Error processing {audio_path}: {str(e)}")
+            if os.path.isdir(os.path.join(self.data_root, dir)):
+                for data in os.listdir(os.path.join(self.data_root, dir)):
+                    if os.path.splitext(data)[1] == '.wav':
+                        audio_path = os.path.join(self.data_root, dir, data)
+                        try:
+                            duration = self._get_audio_duration(audio_path)
+                            if duration >= self.min_duration:
+                                if self.include_transcripts:
+                                    transcript = self.transcripts[
+                                            self.transcripts['name'] == data.replace(".wav", ".mp3")
+                                        ]['transcript'].iloc[0]
+                                    self.audio_index[i].append(
+                                        {
+                                            'audio_path': audio_path,
+                                            'duration': duration,
+                                            'transcript': transcript,
+                                        }
+                                    )
+                                else:
+                                    self.audio_index[i].append(
+                                        {
+                                            'audio_path': audio_path,
+                                            'duration': duration,
+                                        }
+                                    )
+                                
+                        except Exception as e:
+                            logging.warning(f"Error processing {audio_path}: {str(e)}")
 
         self._validate_speakers()
 
@@ -58,6 +76,14 @@ class SpeakerDatabase:
             raise ValueError(f"Speaker {speaker_id} not found in database")
 
         audio_info = random.choice(self.audio_index[speaker_id])
+        if self.include_transcripts:
+            return {
+            'speaker_id': speaker_id,
+            'audio_path': os.path.join(self.data_root, audio_info['audio_path']),
+            'duration': audio_info['duration'],
+            'transcript': audio_info['transcript'],
+            'volume': 1.0
+        }
         return {
             'speaker_id': speaker_id,
             'audio_path': os.path.join(self.data_root, audio_info['audio_path']),

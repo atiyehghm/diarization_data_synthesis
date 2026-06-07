@@ -4,3 +4,9 @@ pyproject.toml
 __pycache__/
 **/__pycache__/
 /configs/base_config.yaml
+/shemo_5k/
+/fleurs_synthetic_data/
+/fleurs_synthetic_data_chunked/
+/playground.ipynb
+/playground_shemo.ipynb
+/ganjoor_cleaner.py

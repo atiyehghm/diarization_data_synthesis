@@ -1,23 +1,33 @@
 # Default synthes setup
 sr: 16000
+include_transcripts: False
 
 # Augment
 reverb_level_range: [0.3, 0.7]
-rir_prob: 0.1
+rir_prob: 0.0
 snr_range: [5, 25]
-noise_prob: 0.1
+noise_prob: 0.0
+white_noise_snr_range: [5, 20]
+white_noise_prob: 0.0
 
 # Generation
-dialog_type_probs: [0.1, 0.5, 0.4]
-volume_type_probs: [0.5, 0.5]
+dialog_type_probs: [0.1, 0.4, 0.4, 0.1]
+volume_type_probs: [0.3, 0.7]
 normalization_var: 0.5
 min_volume: 0.1
 max_volume: 2.0
 num_speakers: [2, 6]
 turns_per_speaker: [2, 4]
-max_pause: 1.5
-overlap_range: [0.2, 0.8]
-max_overlap: 1.5
+max_pause: 2.0
+overlap_probs: [0.3, 0.8, 1.0] 
+small_overlap: 2.0
+max_overlap: 5.0
+fade_in: 0.5
+fade_out: 1.0
+min_backchannel_primary_duration: 9.0  # Minimum length of the long utterance
+backchannel_min_offset: 0.5  # Margin from the edges of primary track
+backchannel_volume_scale: 0.9  # Relative volume of interrupting speaker
+
 
 # Data
 speaker_data_path: "/path/to/speaker/audios"
